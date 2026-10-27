@@ -379,12 +379,14 @@ html, body {
    ===================================================================== */
 var CONFIG = {
     accesos: [
-        { nombre: 'TV Abierta', color: '#0ea5e9', icono: 'tvabierta.svg', tipo: 'tvabierta',
-          etiqueta: 'EN VIVO', texto: 'Canales de televisión abierta por internet.' },
+        { nombre: 'TV Abierta', color: '#0ea5e9', icono: 'tvabierta.svg', tipo: 'url', url: 'http://192.168.1.90/',
+          etiqueta: 'EN VIVO', texto: 'Tu TV Abierta del PC (Docker). El PC debe estar encendido.' },
         { nombre: 'YouTube', color: '#ef4444', icono: 'youtube.svg', tipo: 'url', url: 'https://www.youtube.com/tv',
           etiqueta: 'VIDEOS', texto: 'YouTube para televisores.' },
-        { nombre: 'Disney+', color: '#2563eb', icono: 'disneyplus.svg', tipo: 'url', url: 'https://www.disneyplus.com',
-          etiqueta: 'STREAMING', texto: 'Versión web de Disney+.' },
+        { nombre: 'Disney+', color: '#2563eb', icono: 'disneyplus.svg', tipo: 'url', url: 'https://cd-dmgz.bamgrid.com/bbd/hisense_tv/index.html',
+          etiqueta: 'STREAMING', texto: 'La app de Disney+ del TV.' },
+        { nombre: 'Spotify', color: '#1db954', icono: 'spotify.svg', tipo: 'url', url: 'https://api-partner.spotify.com/tvapp?platform=vidaa',
+          etiqueta: 'MÚSICA', texto: 'La app de Spotify del TV: música y podcasts.' },
         { nombre: 'Twitch', color: '#9146ff', icono: 'twitch.svg', tipo: 'url', url: 'https://www.twitch.tv',
           etiqueta: 'EN VIVO', texto: 'Versión web de Twitch.' },
         { nombre: 'Netflix', color: '#e50914', fondo: '#1c1c1c', icono: 'netflix.svg', tipo: 'aviso',
