@@ -60,6 +60,30 @@ html, body {
 .fecha .dia { display: block; font-size: 19px; font-weight: 700; color: #f1f5f9; }
 .fecha .dmy { display: block; font-size: 16px; color: #94a3b8; margin-top: 4px; }
 
+/* Volumen del TV (solo lectura, únicamente en el TV) */
+.volumen {
+    position: absolute; right: 0; top: 14px; height: 52px; padding: 0 24px 0 18px;
+    border-radius: 26px; background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.1);
+    white-space: nowrap; display: none;
+}
+.volumen.visible { display: block; }
+.volumen svg, .volumen .vol-num, .volumen .vol-barra { display: inline-block; vertical-align: middle; }
+.volumen svg { width: 30px; height: 30px; margin-top: 9px; }
+.volumen .vol-num { width: 128px; margin-left: 10px; font-size: 24px; font-weight: 700; line-height: 48px; }
+.volumen .vol-barra { width: 150px; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.15); overflow: hidden; }
+#vol-relleno {
+    width: 150px; height: 8px; background: #f1f5f9;
+    -webkit-transform-origin: 0 0; transform-origin: 0 0;
+    -webkit-transform: scaleX(0); transform: scaleX(0);
+    -webkit-transition: -webkit-transform 0.2s ease-out; transition: transform 0.2s ease-out;
+}
+.volumen.mudo .vol-num { color: #94a3b8; }
+.volumen.mudo #vol-relleno { opacity: 0.3; }
+.volumen .ondas { display: inline; }
+.volumen.mudo .ondas { display: none; }
+.volumen .cruz { display: none; }
+.volumen.mudo .cruz { display: inline; }
+
 .vitrina { position: absolute; left: 90px; top: 250px; width: 1040px; }
 .etiqueta {
     display: inline-block; padding: 4px 11px; margin-bottom: 14px;
@@ -247,6 +271,15 @@ html, body {
             <div class="fecha">
                 <span id="dia" class="dia">--</span>
                 <span id="dmy" class="dmy">--/--/----</span>
+            </div>
+            <div id="volumen" class="volumen">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#f1f5f9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 9h4l5-4v14l-5-4H4z" fill="#f1f5f9"/>
+                    <path class="ondas" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>
+                    <path class="cruz" d="M16 9l6 6M22 9l-6 6"/>
+                </svg>
+                <span id="vol-num" class="vol-num">--</span>
+                <div class="vol-barra"><div id="vol-relleno"></div></div>
             </div>
         </div>
 
@@ -456,6 +489,24 @@ var CONFIG = {
     }
     reloj();
     setInterval(reloj, 1000);
+
+    /* ---------- Volumen del TV (solo lectura; en el PC no se muestra) ---------- */
+    function leerTV(nombre) {
+        if (typeof window[nombre] !== 'function') return null;
+        try { return window[nombre](); } catch (e) { return null; }
+    }
+    function volumenTV() {
+        var v = parseInt(leerTV('Hisense_GetVolume'), 10);
+        if (isNaN(v)) return;
+        v = limitar(v, 0, 100);
+        var m = leerTV('Hisense_GetMute');
+        var mudo = (m === true || m === 1 || m === '1' || m === 'true');
+        $('volumen').className = 'volumen visible' + (mudo ? ' mudo' : '');
+        $('vol-num').textContent = mudo ? 'Silencio' : v + '%';
+        setTransform($('vol-relleno'), 'scaleX(' + (v / 100) + ')');
+    }
+    volumenTV();
+    setInterval(volumenTV, 1000);
 
     /* ---------- Construir tarjetas y brillos ---------- */
     var tarjetas = [], brillos = [];
