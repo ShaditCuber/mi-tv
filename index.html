@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mi TV</title>
+<!--
+  Basado en Aura TV de cralex11 (https://github.com/cralex11/aura-tv), licencia MIT.
+  Ver archivo LICENSE.
+-->
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; outline: none; -webkit-user-select: none; user-select: none; }
+
+html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #06070a; color: #ffffff;
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+/* Contenedor fijo 1920x1080. Si la ventana mide otra cosa, se escala con transform. */
+#app {
+    position: absolute; top: 0; left: 0;
+    width: 1920px; height: 1080px; overflow: hidden;
+    -webkit-transform-origin: 0 0; transform-origin: 0 0;
+}
+/* El brillo cubre toda la ventana, también el espacio que sobra fuera de 16:9 */
+#brillos { position: fixed; top: 0; left: 0; right: 0; bottom: 0; overflow: hidden; }
+
+/* ---------- Brillo de fondo ---------- */
+/* Al cambiar de app: el brillo nuevo aparece y se "asienta" (escala 1.12 -> 1) */
+.brillo {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    opacity: 0; pointer-events: none;
+    -webkit-transform: scale(1.12); transform: scale(1.12);
+    -webkit-transition: opacity 0.2s ease-out, -webkit-transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition: opacity 0.2s ease-out, transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.brillo.activo { opacity: 1; -webkit-transform: scale(1); transform: scale(1); }
+
+/* ---------- Vistas ---------- */
+.vista {
+    position: absolute; top: 0; left: 0; width: 1920px; height: 1080px;
+    opacity: 0; visibility: hidden;
+    -webkit-transition: opacity 0.25s ease-out; transition: opacity 0.25s ease-out;
+}
+.vista.visible { opacity: 1; visibility: visible; }
+
+/* ---------- Inicio ---------- */
+#inicio { padding: 48px 84px 38px; }
+
+.cabecera { position: relative; height: 80px; }
+.reloj {
+    position: absolute; left: 0; top: 4px;
+    font-size: 64px; font-weight: 200; letter-spacing: -2px; line-height: 1;
+}
+.fecha {
+    position: absolute; left: 210px; top: 8px;
+    border-left: 2px solid rgba(255,255,255,0.12); padding-left: 18px;
+}
+.fecha .dia { display: block; font-size: 19px; font-weight: 700; color: #f1f5f9; }
+.fecha .dmy { display: block; font-size: 16px; color: #94a3b8; margin-top: 4px; }
+
+.vitrina { position: absolute; left: 90px; top: 250px; width: 1040px; }
+.etiqueta {
+    display: inline-block; padding: 4px 11px; margin-bottom: 14px;
+    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 6px; font-size: 14px; font-weight: 700; letter-spacing: 0.6px;
+}
+.vitrina h1 { font-size: 64px; font-weight: 700; line-height: 1.08; margin-bottom: 12px; }
+.vitrina p { font-size: 22px; color: #cbd5e1; line-height: 1.45; max-width: 900px; margin-bottom: 18px; }
+.indicacion { font-size: 16px; font-weight: 600; color: #94a3b8; }
+
+.tecla {
+    display: inline-block; min-width: 36px; height: 28px; line-height: 26px;
+    padding: 0 9px; margin-right: 8px; text-align: center;
+    border-radius: 6px; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3);
+    font-size: 13px; font-weight: 800; color: #ffffff;
+}
+
+.riel { position: absolute; left: 84px; right: 0; top: 640px; height: 260px; }
+.riel-titulo { padding-left: 6px; margin-bottom: 4px; font-size: 22px; font-weight: 700; color: #f8fafc; }
+.riel-titulo span { margin-left: 16px; font-size: 15px; font-weight: 600; color: #64748b; }
+
+#pista {
+    position: relative; height: 220px; white-space: nowrap;
+    padding: 20px 6px;
+    -webkit-transition: -webkit-transform 0.22s ease-out; transition: transform 0.22s ease-out;
+}
+
+.tarjeta {
+    position: relative; display: inline-block; vertical-align: top;
+    width: 260px; height: 160px; margin-right: 26px;
+    border-radius: 20px; border: 2px solid rgba(255,255,255,0.12);
+    text-align: center; white-space: normal;
+    opacity: 0.8;
+    -webkit-transition: -webkit-transform 0.18s ease-out, opacity 0.18s ease-out;
+    transition: transform 0.18s ease-out, opacity 0.18s ease-out;
+}
+/* Anillo blanco del foco: aparece con opacity (no se anima el borde) */
+.anillo {
+    position: absolute; top: -6px; left: -6px; right: -6px; bottom: -6px;
+    border: 3px solid #ffffff; border-radius: 24px; opacity: 0;
+    -webkit-transition: opacity 0.18s ease-out; transition: opacity 0.18s ease-out;
+}
+.foco .anillo { opacity: 1; }
+.tarjeta.foco { opacity: 1; -webkit-transform: scale(1.12) translateY(-6px); transform: scale(1.12) translateY(-6px); }
+.tarjeta .icono { height: 80px; line-height: 80px; margin: 22px 0 10px; }
+.icono img { vertical-align: middle; }
+.tarjeta .nombre { display: block; font-size: 19px; font-weight: 700; }
+
+/* ---------- Panel de clima ---------- */
+#clima {
+    position: absolute; left: 1196px; top: 150px; width: 640px; height: 420px;
+    padding: 26px 28px; border-radius: 24px;
+    background: rgba(56,189,248,0.07); border: 2px solid rgba(255,255,255,0.1);
+}
+.cl-marca { font-size: 16px; font-weight: 800; letter-spacing: 1px; color: #38bdf8; line-height: 28px; }
+#cl-hora { position: absolute; right: 28px; top: 26px; font-size: 15px; color: #64748b; line-height: 28px; }
+#cl-icono { position: absolute; left: 22px; top: 62px; width: 120px; height: 120px; }
+#cl-temp { position: absolute; left: 156px; top: 58px; font-size: 84px; font-weight: 200; line-height: 1; letter-spacing: -3px; }
+#cl-desc { position: absolute; left: 160px; top: 150px; right: 28px; font-size: 24px; font-weight: 700; }
+#cl-detalle { position: absolute; left: 28px; top: 196px; right: 28px; font-size: 17px; color: #94a3b8; }
+#cl-dias { position: absolute; left: 28px; right: 28px; top: 232px; height: 80px; white-space: nowrap; }
+.cl-dia { display: inline-block; vertical-align: top; width: 194px; height: 80px; position: relative; }
+.cl-dia .nom { position: absolute; left: 54px; top: 8px; font-size: 17px; font-weight: 700; color: #e2e8f0; }
+.cl-dia .tmp { position: absolute; left: 54px; top: 36px; font-size: 17px; color: #94a3b8; }
+.cl-dia svg { position: absolute; left: 0; top: 14px; }
+#sp-botones { position: absolute; left: 28px; right: 28px; bottom: 30px; white-space: nowrap; }
+
+.boton {
+    position: relative; display: inline-block; vertical-align: top;
+    height: 60px; min-width: 76px; padding: 0 20px; margin-right: 12px;
+    line-height: 56px; text-align: center; font-size: 20px; font-weight: 700;
+    border-radius: 30px; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.12);
+    -webkit-transition: -webkit-transform 0.18s ease-out; transition: transform 0.18s ease-out;
+}
+.boton .anillo { border-radius: 36px; }
+.boton.foco { -webkit-transform: scale(1.1); transform: scale(1.1); }
+.boton svg { width: 26px; height: 26px; margin-top: 15px; fill: #ffffff; }
+
+.pie {
+    position: absolute; left: 84px; right: 84px; bottom: 30px;
+    padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08);
+    font-size: 15px; color: #64748b;
+}
+.pie .ayuda { display: inline-block; margin-right: 26px; }
+.pie .credito { position: absolute; right: 0; top: 14px; }
+
+/* ---------- TV Abierta ---------- */
+#tvabierta { padding: 40px 60px; }
+#tvabierta h2 { font-size: 34px; font-weight: 700; margin-bottom: 20px; }
+#tvabierta h2 span { margin-left: 18px; font-size: 16px; font-weight: 600; color: #94a3b8; }
+
+.marco-video {
+    position: absolute; left: 60px; top: 110px; width: 1216px; height: 684px;
+    background: #000; border-radius: 16px; overflow: hidden;
+    border: 2px solid rgba(255,255,255,0.12);
+}
+.marco-video video { width: 100%; height: 100%; background: #000; }
+#estado-video {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 22px;
+    background: rgba(0,0,0,0.7); font-size: 18px; color: #e2e8f0;
+}
+#vol-aviso {
+    position: absolute; right: 30px; top: 30px; padding: 14px 24px;
+    background: rgba(0,0,0,0.75); border-radius: 14px; font-size: 26px; font-weight: 700;
+    opacity: 0; -webkit-transition: opacity 0.2s ease-out; transition: opacity 0.2s ease-out;
+}
+#vol-aviso.visible { opacity: 1; }
+/* Pantalla completa dentro de la página (cambio instantáneo, sin animar tamaño) */
+#tvabierta.completa .marco-video { left: 0; top: 0; width: 1920px; height: 1080px; border-radius: 0; border: 0; z-index: 50; }
+#tvabierta.completa #estado-video { opacity: 0; }
+
+#grilla { position: absolute; left: 1300px; top: 96px; width: 590px; height: 900px; overflow: hidden; }
+#grilla-interior { padding: 14px 0 0 16px; -webkit-transition: -webkit-transform 0.2s ease-out; transition: transform 0.2s ease-out; }
+
+.canal {
+    position: relative; float: left;
+    width: 260px; height: 110px; margin: 0 20px 20px 0; padding: 16px 18px;
+    border-radius: 14px; background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.09);
+    opacity: 0.85;
+    -webkit-transition: -webkit-transform 0.18s ease-out, opacity 0.18s ease-out;
+    transition: transform 0.18s ease-out, opacity 0.18s ease-out;
+}
+.canal .anillo { top: -5px; left: -5px; right: -5px; bottom: -5px; border-radius: 17px; }
+.canal.foco { opacity: 1; -webkit-transform: scale(1.06); transform: scale(1.06); }
+.canal .num { display: block; font-size: 14px; font-weight: 700; color: #94a3b8; }
+.canal .titulo { display: block; font-size: 22px; font-weight: 700; margin-top: 6px; }
+.canal .sonando { position: absolute; right: 16px; top: 16px; width: 12px; height: 12px; border-radius: 6px; background: #10b981; opacity: 0; }
+.canal.actual .sonando { opacity: 1; }
+
+.pie-tv { position: absolute; left: 60px; bottom: 34px; font-size: 15px; color: #64748b; }
+.pie-tv .ayuda { display: inline-block; margin-right: 26px; }
+
+/* ---------- Diagnóstico / laboratorio (pantalla oculta) ---------- */
+#diag { padding: 40px 60px; background: #06070a; overflow: hidden; }
+#diag h2 { font-size: 30px; font-weight: 700; margin-bottom: 6px; }
+#diag .sub { font-size: 16px; color: #94a3b8; margin-bottom: 18px; }
+#diag-marco { position: absolute; left: 60px; right: 60px; top: 120px; bottom: 40px; overflow: hidden; }
+#diag-texto {
+    font-family: Consolas, "DejaVu Sans Mono", monospace; font-size: 19px; line-height: 1.45;
+    color: #e2e8f0; white-space: pre-wrap; word-wrap: break-word;
+    -webkit-transition: -webkit-transform 0.15s ease-out; transition: transform 0.15s ease-out;
+}
+#diag-tecla { position: absolute; right: 60px; top: 46px; font-size: 18px; color: #facc15; }
+
+/* ---------- Aviso ---------- */
+#aviso {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.85); z-index: 500;
+    opacity: 0; visibility: hidden;
+    -webkit-transition: opacity 0.2s ease-out; transition: opacity 0.2s ease-out;
+}
+#aviso.visible { opacity: 1; visibility: visible; }
+.aviso-caja {
+    position: absolute; left: 560px; top: 380px; width: 800px;
+    padding: 44px; text-align: center;
+    background: #10131d; border: 2px solid rgba(255,255,255,0.16); border-radius: 26px;
+    -webkit-transform: scale(0.92); transform: scale(0.92);
+    -webkit-transition: -webkit-transform 0.2s ease-out; transition: transform 0.2s ease-out;
+}
+#aviso.visible .aviso-caja { -webkit-transform: scale(1); transform: scale(1); }
+#aviso-titulo { font-size: 32px; font-weight: 700; margin-bottom: 18px; }
+#aviso-texto { font-size: 24px; color: #cbd5e1; line-height: 1.4; margin-bottom: 28px; }
+
+/* ---------- Abriendo app ---------- */
+#abriendo {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(4,5,8,0.94); z-index: 1000; text-align: center;
+    opacity: 0; visibility: hidden;
+    -webkit-transition: opacity 0.2s ease-out; transition: opacity 0.2s ease-out;
+}
+#abriendo.visible { opacity: 1; visibility: visible; }
+#abriendo-halo { width: 240px; height: 130px; line-height: 130px; margin: 380px auto 26px; border-radius: 36px; }
+#abriendo-halo img { vertical-align: middle; }
+#abriendo-texto { font-size: 36px; font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="brillos"></div>
+<div id="app">
+
+    <!-- Vista: Inicio -->
+    <div id="inicio" class="vista visible">
+        <div class="cabecera">
+            <div id="reloj" class="reloj">00:00</div>
+            <div class="fecha">
+                <span id="dia" class="dia">--</span>
+                <span id="dmy" class="dmy">--/--/----</span>
+            </div>
+        </div>
+
+        <div class="vitrina">
+            <span id="v-etiqueta" class="etiqueta"></span>
+            <h1 id="v-titulo"></h1>
+            <p id="v-texto"></p>
+            <div class="indicacion"><span class="tecla">OK</span><span id="v-accion">Abrir</span></div>
+        </div>
+
+        <div id="clima">
+            <div class="cl-marca" id="cl-ciudad">CLIMA</div>
+            <div id="cl-hora"></div>
+            <div id="cl-icono"></div>
+            <div id="cl-temp">--°</div>
+            <div id="cl-desc">Cargando clima...</div>
+            <div id="cl-detalle"></div>
+            <div id="cl-dias"></div>
+            <div id="sp-botones"></div>
+        </div>
+
+        <div class="riel">
+            <div class="riel-titulo">Accesos <span id="contador"></span></div>
+            <div id="pista"></div>
+        </div>
+
+        <div class="pie">
+            <span class="ayuda"><span class="tecla">&#9664; &#9654;</span>Moverse</span>
+            <span class="ayuda"><span class="tecla">&#9650; &#9660;</span>Seguir viendo / Accesos</span>
+            <span class="ayuda"><span class="tecla">OK</span>Abrir</span>
+        </div>
+    </div>
+
+    <!-- Vista: TV Abierta -->
+    <div id="tvabierta" class="vista">
+        <h2>TV Abierta <span id="tv-canal-actual">Elige un canal</span><span id="tv-vol"></span></h2>
+        <div class="marco-video">
+            <video id="video" autoplay playsinline></video>
+            <div id="estado-video">Elige un canal con las flechas y aprieta OK.</div>
+            <div id="vol-aviso"></div>
+        </div>
+        <div id="grilla"><div id="grilla-interior"></div></div>
+        <div class="pie-tv">
+            <span class="ayuda"><span class="tecla">&#9650; &#9660; &#9664; &#9654;</span>Canales</span>
+            <span class="ayuda"><span class="tecla">OK</span>Ver (otra vez: pantalla completa)</span>
+            <span class="ayuda"><span class="tecla">&#9650; &#9660;</span>En pantalla completa: volumen</span>
+            <span class="ayuda"><span class="tecla">ATRÁS</span>Volver</span>
+        </div>
+    </div>
+
+    <!-- Vista oculta: diagnóstico / laboratorio (en la primera tarjeta, ◀ cinco veces) -->
+    <div id="diag" class="vista">
+        <h2>Diagnóstico del TV</h2>
+        <div class="sub">Solo lectura: no cambia nada del TV. &#9650; &#9660; desplazar · ATRÁS volver</div>
+        <div id="diag-tecla"></div>
+        <div id="diag-marco"><div id="diag-texto"></div></div>
+    </div>
+
+    <!-- Aviso -->
+    <div id="aviso">
+        <div class="aviso-caja">
+            <div id="aviso-titulo"></div>
+            <div id="aviso-texto"></div>
+            <span class="tecla">OK</span>Entendido
+        </div>
+    </div>
+
+    <!-- Abriendo app -->
+    <div id="abriendo">
+        <div id="abriendo-halo"></div>
+        <div id="abriendo-texto"></div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+<script>
+/* =====================================================================
+   CONFIGURACIÓN — edita solo este bloque
+   ---------------------------------------------------------------------
+   ACCESOS (se muestran en este orden). Cada uno tiene:
+     nombre  : texto de la tarjeta
+     color   : color de la tarjeta y del brillo de fondo
+     fondo   : opcional, color de la tarjeta si debe ser distinto al del brillo
+     icono   : archivo del logo dentro de la carpeta iconos/
+     etiqueta, texto : lo que aparece arriba al enfocarlo
+     tipo    : 'tvabierta' -> abre el reproductor de esta página
+               'url'       -> navega a la dirección "url"
+               'aviso'     -> muestra el mensaje "aviso"
+
+   CANALES de TV Abierta: nombre + url (.m3u8).
+   Si url está vacía, el canal aparece pero avisa que falta la dirección.
+
+   CLIMA (datos gratis de open-meteo.com, sin cuenta ni clave):
+     ciudad   : nombre que se muestra
+     latitud, longitud : en Google Maps, clic derecho sobre tu casa
+                         y se copian los dos números que aparecen
+   ===================================================================== */
+var CONFIG = {
+    accesos: [
+        { nombre: 'TV Abierta', color: '#0ea5e9', icono: 'tvabierta.svg', tipo: 'tvabierta',
+          etiqueta: 'EN VIVO', texto: 'Canales de televisión abierta por internet.' },
+        { nombre: 'YouTube', color: '#ef4444', icono: 'youtube.svg', tipo: 'url', url: 'https://www.youtube.com/tv',
+          etiqueta: 'VIDEOS', texto: 'YouTube para televisores.' },
+        { nombre: 'Disney+', color: '#2563eb', icono: 'disneyplus.svg', tipo: 'url', url: 'https://www.disneyplus.com',
+          etiqueta: 'STREAMING', texto: 'Versión web de Disney+.' },
+        { nombre: 'Twitch', color: '#9146ff', icono: 'twitch.svg', tipo: 'url', url: 'https://www.twitch.tv',
+          etiqueta: 'EN VIVO', texto: 'Versión web de Twitch.' },
+        { nombre: 'Netflix', color: '#e50914', fondo: '#1c1c1c', icono: 'netflix.svg', tipo: 'aviso',
+          aviso: 'Abre esta app con su botón en el control remoto.',
+          etiqueta: 'STREAMING', texto: 'Se abre con el botón Netflix del control.' },
+        { nombre: 'Prime Video', color: '#00a8e1', icono: 'primevideo.svg', tipo: 'aviso',
+          aviso: 'Abre esta app con su botón en el control remoto.',
+          etiqueta: 'STREAMING', texto: 'Se abre con el botón Prime Video del control.' },
+        { nombre: 'HDMI 1', color: '#64748b', icono: 'hdmi.svg', tipo: 'aviso',
+          aviso: 'Usa el botón INPUT del control.',
+          etiqueta: 'ENTRADA', texto: 'Consola, PC u otro equipo conectado por HDMI.' },
+        { nombre: 'AV', color: '#78716c', icono: 'av.svg', tipo: 'aviso',
+          aviso: 'Usa el botón INPUT del control.',
+          etiqueta: 'ENTRADA', texto: 'Equipo conectado por cable AV.' }
+    ],
+    canales: [
+        { nombre: 'Canal de prueba', url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8' },
+        { nombre: 'TVN', url: '' },
+        { nombre: 'Mega', url: '' },
+        { nombre: 'Chilevisión', url: '' },
+        { nombre: 'Canal 13', url: '' },
+        { nombre: 'La Red', url: '' },
+        { nombre: 'TV+', url: '' }
+    ],
+    clima: {
+        ciudad: 'Los Ángeles, Chile',
+        latitud: -37.47,
+        longitud: -72.35
+    },
+    sonidos: true
+};
+/* ===================== fin de la configuración ===================== */
+
+(function () {
+    'use strict';
+
+    var TECLA = { IZQ: 37, ARR: 38, DER: 39, ABA: 40, OK: 13 };
+    var ATRAS = [8, 27, 461, 10009];
+    var COLUMNAS_CANALES = 2;
+
+    function $(id) { return document.getElementById(id); }
+    function esAtras(code) { for (var i = 0; i < ATRAS.length; i++) { if (ATRAS[i] === code) return true; } return false; }
+    function pad(n) { return n < 10 ? '0' + n : '' + n; }
+    function rgba(hex, a) {
+        var h = hex.replace('#', '');
+        return 'rgba(' + parseInt(h.substr(0, 2), 16) + ',' + parseInt(h.substr(2, 2), 16) + ',' + parseInt(h.substr(4, 2), 16) + ',' + a + ')';
+    }
+    function setTransform(el, valor) { el.style.webkitTransform = valor; el.style.transform = valor; }
+    function addClase(el, c) { if (el.className.indexOf(c) === -1) el.className += ' ' + c; }
+    function quitarClase(el, c) { el.className = (' ' + el.className + ' ').replace(' ' + c + ' ', ' ').replace(/^\s+|\s+$/g, ''); }
+    function tieneClase(el, c) { return (' ' + el.className + ' ').indexOf(' ' + c + ' ') !== -1; }
+    function limitar(v, min, max) { return v < min ? min : (v > max ? max : v); }
+
+    // localStorage puede fallar (modo privado, almacenamiento bloqueado)
+    function leer(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
+    function guardar(k, v) { try { window.localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento */ } }
+    function borrar(k) { try { window.localStorage.removeItem(k); } catch (e) { /* sin almacenamiento */ } }
+
+    /* ---------- Escalado: la página siempre se ve como 1920x1080 ---------- */
+    function escalar() {
+        var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+        // Centrado: reparte el espacio sobrante a ambos lados
+        var x = Math.round((window.innerWidth - 1920 * s) / 2), y = Math.round((window.innerHeight - 1080 * s) / 2);
+        setTransform($('app'), 'translate(' + x + 'px, ' + y + 'px) scale(' + s + ')');
+    }
+    window.addEventListener('resize', escalar);
+    escalar();
+
+    /* ---------- Sonidos suaves ---------- */
+    var audio = null;
+    function iniciarAudio() {
+        if (!CONFIG.sonidos) return null;
+        if (!audio) {
+            var AC = window.AudioContext || window.webkitAudioContext;
+            if (AC) { try { audio = new AC(); } catch (e) { audio = null; } }
+        }
+        if (audio && audio.state === 'suspended' && audio.resume) audio.resume();
+        return audio;
+    }
+    function sonido(tipo, f1, f2, vol, dur) {
+        var ctx = iniciarAudio();
+        if (!ctx) return;
+        var t = ctx.currentTime, osc = ctx.createOscillator(), g = ctx.createGain();
+        osc.type = tipo;
+        osc.frequency.setValueAtTime(f1, t);
+        osc.frequency.exponentialRampToValueAtTime(f2, t + dur);
+        g.gain.setValueAtTime(vol, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        osc.connect(g); g.connect(ctx.destination);
+        osc.start(t); osc.stop(t + dur);
+    }
+    function tic() { sonido('sine', 750, 300, 0.05, 0.015); }
+    function campana() { sonido('triangle', 520, 1040, 0.12, 0.13); }
+
+    /* ---------- Reloj (dd/mm/YYYY) ---------- */
+    var DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    function reloj() {
+        var d = new Date();
+        $('reloj').textContent = pad(d.getHours()) + ':' + pad(d.getMinutes());
+        $('dia').textContent = DIAS[d.getDay()];
+        $('dmy').textContent = pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear();
+    }
+    reloj();
+    setInterval(reloj, 1000);
+
+    /* ---------- Construir tarjetas y brillos ---------- */
+    var tarjetas = [], brillos = [];
+    function icono(a) { return '<img src="iconos/' + a.icono + '" alt="">'; }
+    for (var i = 0; i < CONFIG.accesos.length; i++) {
+        var a = CONFIG.accesos[i];
+        var t = document.createElement('div');
+        t.className = 'tarjeta';
+        t.style.background = a.fondo
+            ? 'linear-gradient(135deg, ' + a.fondo + ' 0%, #050505 100%)'
+            : 'linear-gradient(135deg, ' + rgba(a.color, 0.55) + ' 0%, ' + rgba(a.color, 0.12) + ' 100%)';
+        t.innerHTML = '<div class="anillo"></div><div class="icono">' + icono(a) + '</div><span class="nombre">' + a.nombre + '</span>';
+        $('pista').appendChild(t);
+        tarjetas.push(t);
+
+        var b = document.createElement('div');
+        b.className = 'brillo';
+        // Dos focos de color: uno grande detrás del título y otro abajo, detrás de las tarjetas
+        b.style.background =
+            'radial-gradient(ellipse at 28% 32%, ' + rgba(a.color, 0.62) + ' 0%, ' + rgba(a.color, 0.28) + ' 32%, rgba(0,0,0,0) 68%), ' +
+            'radial-gradient(ellipse at 75% 105%, ' + rgba(a.color, 0.45) + ' 0%, rgba(0,0,0,0) 55%)';
+        $('brillos').appendChild(b);
+        brillos.push(b);
+    }
+
+    /* ---------- Inicio: foco ---------- */
+    // fila 'riel' = tarjetas de accesos, fila 'sp' = botón del panel de clima
+    var fila = 'riel', focoInicio = 0, focoSp = 0;
+
+    function enfocarInicio(n, conSonido) {
+        if (n < 0 || n >= tarjetas.length) return;
+        if (conSonido && n !== focoInicio) tic();
+        quitarClase(tarjetas[focoInicio], 'foco');
+        quitarClase(brillos[focoInicio], 'activo');
+        focoInicio = n;
+        addClase(tarjetas[n], 'foco');
+        addClase(brillos[n], 'activo');
+
+        // Desliza la pista para que la tarjeta enfocada quede visible
+        var desplaz = Math.max(0, n - 3) * (260 + 26);
+        setTransform($('pista'), 'translateX(' + (-desplaz) + 'px)');
+
+        var a = CONFIG.accesos[n];
+        $('v-etiqueta').textContent = a.etiqueta || '';
+        $('v-titulo').textContent = a.nombre;
+        $('v-texto').textContent = a.texto || '';
+        $('v-accion').textContent = a.tipo === 'aviso' ? 'Ver cómo abrirlo' : 'Abrir';
+        $('contador').textContent = (n + 1) + ' de ' + tarjetas.length;
+    }
+
+    function botonesSp() { return $('sp-botones').children; }
+
+    function enfocarSp(n, conSonido) {
+        var bs = botonesSp();
+        if (!bs.length) return;
+        n = limitar(n, 0, bs.length - 1);
+        if (conSonido && n !== focoSp) tic();
+        for (var i = 0; i < bs.length; i++) quitarClase(bs[i], 'foco');
+        focoSp = n;
+        addClase(bs[n], 'foco');
+    }
+
+    function irAFila(f) {
+        if (f === fila) return;
+        if (f === 'sp' && !botonesSp().length) return;
+        tic();
+        fila = f;
+        if (f === 'sp') {
+            quitarClase(tarjetas[focoInicio], 'foco');
+            enfocarSp(focoSp, false);
+        } else {
+            var bs = botonesSp();
+            for (var i = 0; i < bs.length; i++) quitarClase(bs[i], 'foco');
+            enfocarInicio(focoInicio, false);
+        }
+    }
+
+    function abrirAcceso(a) {
+        campana();
+        if (a.tipo === 'tvabierta') { mostrarVista('tvabierta'); return; }
+        if (a.tipo === 'aviso') { mostrarAviso(a.nombre, a.aviso); return; }
+        if (a.tipo === 'url' && a.url) {
+            var halo = $('abriendo-halo');
+            halo.innerHTML = icono(a);
+            halo.style.background = a.fondo || a.color;
+            $('abriendo-texto').textContent = 'Abriendo ' + a.nombre + '...';
+            addClase($('abriendo'), 'visible');
+            setTimeout(function () { window.location.href = a.url; }, 500);
+        }
+    }
+
+    /* ---------- Aviso ---------- */
+    var avisoAbierto = false;
+    function mostrarAviso(titulo, texto) {
+        $('aviso-titulo').textContent = titulo;
+        $('aviso-texto').textContent = texto;
+        addClase($('aviso'), 'visible');
+        avisoAbierto = true;
+    }
+    function cerrarAviso() {
+        quitarClase($('aviso'), 'visible');
+        avisoAbierto = false;
+    }
+
+    /* ---------- Vistas ---------- */
+    var vista = 'inicio';
+    function mostrarVista(v) {
+        quitarClase($(vista), 'visible');
+        vista = v;
+        addClase($(v), 'visible');
+        if (v === 'inicio') { detenerVideo(); panel.actualizarBoton(); }
+        if (v === 'tvabierta') enfocarCanal(focoCanal, false);
+        if (v === 'diag') diagnostico();
+    }
+
+    /* =================================================================
+       DIAGNÓSTICO / LABORATORIO — solo lectura
+       Nunca llama a setParam, setDabTool ni a nada que escriba.
+       ================================================================= */
+    // Funciones que interesa saber si existen
+    var LAB_FUNCIONES = ['TvInfo_getParam', 'TvInfo_setParam', 'oipfObjectFactory', 'vowOS', 'vowOSContext',
+                         'omi_platform', 'opera_omi', 'HiUtils_createRequest', 'KeyEvent'];
+    // Claves que se prueban con TvInfo_getParam (no hay lista oficial: son candidatas)
+    var LAB_CLAVES = ['soundVolume', 'volume', 'initialData', 'source', 'inputSource', 'currentSource',
+                      'curSource', 'sourceList', 'sourcelist', 'tvSource', 'hdmi', 'av', 'tuner', 'channel'];
+    // Objetos OIPF/HbbTV cuyo soporte se consulta (isObjectSupported solo pregunta, no crea nada)
+    var LAB_OIPF = ['video/broadcast', 'application/oipfApplicationManager', 'application/oipfConfiguration',
+                    'application/oipfCapabilities', 'application/oipfSearchManager'];
+    // Nunca se muestran valores de funciones con estos nombres (identificadores del equipo)
+    var PRIVADO = /id$|ids|mac|serial|token|uuid|ads|key|account|user|email/i;
+
+    var diagLineas = [], diagScroll = 0;
+
+    function linea(t) { diagLineas.push(t === undefined ? '' : t); }
+    function texto(v) {
+        if (v === undefined) return 'undefined';
+        if (v === null) return 'null';
+        var s;
+        try { s = typeof v === 'string' ? '"' + v + '"' : JSON.stringify(v); } catch (e) { s = String(v); }
+        if (s === undefined) s = String(v);
+        return s.length > 300 ? s.substr(0, 300) + '…' : s;
+    }
+    function llamar(fn, args) {
+        try { return texto(fn.apply(window, args || [])); } catch (e) { return 'ERROR: ' + (e && e.message ? e.message : e); }
+    }
+    function fuente(fn) {
+        try { return String(fn).replace(/\s+/g, ' ').substr(0, 200); } catch (e) { return '?'; }
+    }
+    function nombresGlobales() {
+        var vistos = {}, lista = [], k;
+        try { var props = Object.getOwnPropertyNames(window); for (var i = 0; i < props.length; i++) vistos[props[i]] = 1; } catch (e) { /* navegador antiguo */ }
+        for (k in window) vistos[k] = 1;
+        for (k in vistos) { if (vistos.hasOwnProperty(k)) lista.push(k); }
+        return lista.sort();
+    }
+    function miembros(obj) {
+        var out = [];
+        try { for (var k in obj) out.push(k + ':' + typeof obj[k]); } catch (e) { out.push('ERROR: ' + e.message); }
+        return out.join(', ') || '(sin miembros visibles)';
+    }
+    function soporta(prop, val) {
+        try { return window.CSS && CSS.supports ? (CSS.supports(prop, val) ? 'sí' : 'no') : '?'; } catch (e) { return '?'; }
+    }
+
+    function diagnostico() {
+        diagLineas = [];
+        diagScroll = 0;
+        var i, k, nombre;
+
+        linea('== NAVEGADOR ==');
+        linea('userAgent: ' + navigator.userAgent);
+        linea('ventana: ' + window.innerWidth + 'x' + window.innerHeight + ' · pantalla: ' + screen.width + 'x' + screen.height + ' · devicePixelRatio: ' + window.devicePixelRatio);
+        linea('CSS gap: ' + soporta('gap', '1px') + ' · inset: ' + soporta('inset', '0') + ' · backdrop-filter: ' + soporta('backdrop-filter', 'blur(1px)'));
+        linea('localStorage: ' + (function () { try { localStorage.setItem('_p', '1'); localStorage.removeItem('_p'); return 'sí'; } catch (e) { return 'no'; } })() +
+              ' · fetch: ' + (typeof window.fetch) + ' · Promise: ' + (typeof window.Promise) +
+              ' · Widevine API: ' + (typeof navigator.requestMediaKeySystemAccess));
+        linea('HLS nativo: ' + (document.createElement('video').canPlayType('application/vnd.apple.mpegurl') || 'no') +
+              ' · hls.js: ' + (window.Hls && window.Hls.isSupported() ? 'sí' : 'no'));
+        linea();
+
+        linea('== FUNCIONES DEL TV (typeof) ==');
+        for (i = 0; i < LAB_FUNCIONES.length; i++) {
+            nombre = LAB_FUNCIONES[i];
+            linea(nombre + ': ' + (typeof window[nombre]));
+        }
+        linea();
+
+        var globales = nombresGlobales(), propios = [];
+        for (i = 0; i < globales.length; i++) {
+            if (/^(Hisense|TvInfo|HiUtils|vow|omi|opera|oipf|Vidaa|hisense|tv_|Tv)/.test(globales[i])) propios.push(globales[i]);
+        }
+        linea('== GLOBALES PROPIOS DEL TV (' + propios.length + ') ==');
+        linea(propios.join(', ') || '(ninguno: probablemente estás en un PC)');
+        linea();
+
+        linea('== LECTURAS Hisense_Get* (sin argumentos) ==');
+        var hayGet = false;
+        for (i = 0; i < propios.length; i++) {
+            nombre = propios[i];
+            if (!/^Hisense_Get/.test(nombre) || typeof window[nombre] !== 'function') continue;
+            hayGet = true;
+            linea(nombre + ' = ' + (PRIVADO.test(nombre.replace('Hisense_Get', '')) ? '(oculto: identificador)' : llamar(window[nombre])));
+        }
+        if (!hayGet) linea('(no hay funciones Hisense_Get*)');
+        linea();
+
+        linea('== TvInfo_getParam (solo lectura) ==');
+        if (typeof window.TvInfo_getParam === 'function') {
+            linea('código: ' + fuente(window.TvInfo_getParam));
+            for (i = 0; i < LAB_CLAVES.length; i++) {
+                linea('getParam("' + LAB_CLAVES[i] + '") = ' + llamar(window.TvInfo_getParam, [LAB_CLAVES[i]]));
+            }
+        } else linea('(no existe)');
+        if (typeof window.TvInfo_setParam === 'function') linea('setParam existe — NO se llama. código: ' + fuente(window.TvInfo_setParam));
+        linea();
+
+        linea('== vowOS (solo nombres, no se llama nada) ==');
+        if (window.vowOS) {
+            linea('vowOS: ' + miembros(window.vowOS));
+            for (k in { service: 1, tvinfo: 1, store: 1 }) {
+                if (window.vowOS[k]) linea('vowOS.' + k + ': ' + miembros(window.vowOS[k]));
+            }
+        } else linea('(no existe)');
+        linea();
+
+        linea('== omi_platform (solo nombres) ==');
+        linea(window.omi_platform ? miembros(window.omi_platform) : '(no existe)');
+        linea();
+
+        linea('== OIPF / HbbTV (antena) ==');
+        var f = window.oipfObjectFactory;
+        if (f) {
+            linea('métodos: ' + miembros(f));
+            if (typeof f.isObjectSupported === 'function') {
+                for (i = 0; i < LAB_OIPF.length; i++) linea('isObjectSupported("' + LAB_OIPF[i] + '") = ' + llamar(function (t) { return f.isObjectSupported(t); }, [LAB_OIPF[i]]));
+            }
+        } else linea('(no existe)');
+        var tipos = [];
+        try { for (i = 0; i < navigator.mimeTypes.length; i++) tipos.push(navigator.mimeTypes[i].type); } catch (e) { /* sin mimeTypes */ }
+        linea('mimeTypes: ' + (tipos.join(', ') || '(ninguno)'));
+        linea();
+        linea('== TECLAS ==');
+        linea('Aprieta cualquier botón del control: su código aparece arriba a la derecha.');
+
+        $('diag-texto').textContent = diagLineas.join('\n');
+        setTransform($('diag-texto'), 'translateY(0)');
+    }
+
+    function desplazarDiag(delta) {
+        var alto = $('diag-texto').offsetHeight - $('diag-marco').offsetHeight;
+        diagScroll = limitar(diagScroll + delta, 0, Math.max(0, alto));
+        setTransform($('diag-texto'), 'translateY(' + (-diagScroll) + 'px)');
+    }
+
+    // Combinaciones secretas: ◀ x5 en la primera tarjeta, o 9 9 9 con teclado numérico
+    var secuencia = '', timerSecuencia = null;
+    function teclaNumero(code) {
+        if (code >= 48 && code <= 57) return String(code - 48);
+        if (code >= 96 && code <= 105) return String(code - 96);
+        return null;
+    }
+
+    /* ---------- TV Abierta ---------- */
+    var canales = [], focoCanal = 0, canalActual = -1, hls = null;
+    var video = $('video');
+    var volTv = 1, timerVol = null;
+
+    for (var c = 0; c < CONFIG.canales.length; c++) {
+        var el = document.createElement('div');
+        el.className = 'canal';
+        el.innerHTML = '<div class="anillo"></div><div class="sonando"></div>' +
+                       '<span class="num">' + pad(c + 1) + '</span><span class="titulo">' + CONFIG.canales[c].nombre + '</span>';
+        $('grilla-interior').appendChild(el);
+        canales.push(el);
+    }
+
+    function enfocarCanal(n, conSonido) {
+        if (n < 0 || n >= canales.length) return;
+        if (conSonido && n !== focoCanal) tic();
+        quitarClase(canales[focoCanal], 'foco');
+        focoCanal = n;
+        addClase(canales[n], 'foco');
+        // Desplaza la grilla si el canal queda bajo el borde
+        var f = Math.floor(n / COLUMNAS_CANALES);
+        var desplaz = Math.max(0, f - 5) * 130;
+        setTransform($('grilla-interior'), 'translateY(' + (-desplaz) + 'px)');
+    }
+
+    function estado(txt) { $('estado-video').textContent = txt; }
+
+    function pintarVolTv() {
+        var pct = Math.round(volTv * 100) + '%';
+        $('tv-vol').textContent = 'Volumen ' + pct;
+        $('vol-aviso').textContent = 'Volumen ' + pct;
+    }
+
+    function cambiarVolTv(delta) {
+        volTv = Math.round(limitar(volTv + delta, 0, 1) * 10) / 10;
+        video.volume = volTv;
+        pintarVolTv();
+        addClase($('vol-aviso'), 'visible');
+        clearTimeout(timerVol);
+        timerVol = setTimeout(function () { quitarClase($('vol-aviso'), 'visible'); }, 1500);
+        tic();
+    }
+
+    function detenerVideo() {
+        if (hls) { hls.destroy(); hls = null; }
+        video.pause();
+        video.removeAttribute('src');
+        try { video.load(); } catch (e) { /* algunos navegadores fallan sin src */ }
+        if (canalActual >= 0) quitarClase(canales[canalActual], 'actual');
+        canalActual = -1;
+        quitarClase($('tvabierta'), 'completa');
+        $('tv-canal-actual').textContent = 'Elige un canal';
+        estado('Elige un canal con las flechas y aprieta OK.');
+    }
+
+    function reproducir(n) {
+        var ch = CONFIG.canales[n];
+        if (!ch.url) {
+            mostrarAviso(ch.nombre, 'Este canal todavía no tiene dirección (.m3u8) en la configuración.');
+            return;
+        }
+        detenerVideo();
+        guardar('ultimo_canal', String(n));
+        canalActual = n;
+        addClase(canales[n], 'actual');
+        $('tv-canal-actual').textContent = ch.nombre;
+        estado('Cargando ' + ch.nombre + '...');
+        video.volume = volTv;
+
+        if (window.Hls && window.Hls.isSupported()) {
+            hls = new window.Hls();
+            hls.on(window.Hls.Events.ERROR, function (ev, data) {
+                if (data && data.fatal) estado('No se pudo reproducir ' + ch.nombre + '. La señal puede estar caída o bloqueada.');
+            });
+            hls.loadSource(ch.url);
+            hls.attachMedia(video);
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = ch.url;
+        } else {
+            estado('Este navegador no puede reproducir canales .m3u8.');
+            return;
+        }
+        var p = video.play();
+        if (p && p.catch) p.catch(function () { /* el autoplay puede requerir interacción */ });
+    }
+
+    video.addEventListener('playing', function () {
+        if (canalActual >= 0) estado('Viendo ' + CONFIG.canales[canalActual].nombre + '. OK otra vez: pantalla completa.');
+    });
+    video.addEventListener('error', function () {
+        if (canalActual >= 0) estado('No se pudo reproducir ' + CONFIG.canales[canalActual].nombre + '.');
+    });
+
+    function okCanal() {
+        if (focoCanal === canalActual) {
+            // Mismo canal: alterna pantalla completa
+            if (tieneClase($('tvabierta'), 'completa')) quitarClase($('tvabierta'), 'completa');
+            else addClase($('tvabierta'), 'completa');
+            return;
+        }
+        campana();
+        reproducir(focoCanal);
+    }
+
+    pintarVolTv();
+
+    /* =================================================================
+       PANEL: clima (Open-Meteo) + botón "Seguir viendo" el último canal
+       ================================================================= */
+    var panel = (function () {
+        var cfg = CONFIG.clima;
+        var CADA = 30 * 60 * 1000; // refresco del clima: 30 minutos
+
+        // Dibujos simples (viewBox 64x64)
+        var NUBE = '<path fill="#cbd5e1" d="M20 46h26a10 10 0 0 0 0-20 14 14 0 0 0-27-3 11 11 0 0 0 1 23z"/>';
+        var DIBUJO = {
+            sol: '<circle cx="32" cy="32" r="12" fill="#facc15"/><g stroke="#facc15" stroke-width="4" stroke-linecap="round">' +
+                 '<path d="M32 6v7M32 51v7M6 32h7M51 32h7M13.6 13.6l5 5M45.4 45.4l5 5M13.6 50.4l5-5M45.4 18.6l5-5"/></g>',
+            luna: '<path fill="#e2e8f0" d="M40 8a24 24 0 1 0 16 38A20 20 0 1 1 40 8z"/>',
+            solnube: '<circle cx="24" cy="22" r="10" fill="#facc15"/>' + NUBE,
+            nube: NUBE,
+            lluvia: NUBE + '<g stroke="#38bdf8" stroke-width="4" stroke-linecap="round"><path d="M24 52l-3 7M34 52l-3 7M44 52l-3 7"/></g>',
+            tormenta: NUBE + '<path fill="#facc15" d="M34 46l-8 12h7l-3 8 10-13h-7l3-7z"/>',
+            nieve: NUBE + '<g fill="#ffffff"><circle cx="24" cy="55" r="3"/><circle cx="34" cy="58" r="3"/><circle cx="44" cy="55" r="3"/></g>',
+            niebla: '<g stroke="#cbd5e1" stroke-width="4" stroke-linecap="round"><path d="M12 24h40M8 34h48M14 44h36"/></g>'
+        };
+        function dibujo(tipo, tam) {
+            return '<svg width="' + tam + '" height="' + tam + '" viewBox="0 0 64 64">' + (DIBUJO[tipo] || NUBE) + '</svg>';
+        }
+
+        // Códigos WMO de Open-Meteo -> [texto, dibujo]
+        function describir(c, esDia) {
+            if (c === 0) return ['Despejado', esDia ? 'sol' : 'luna'];
+            if (c === 1) return ['Mayormente despejado', esDia ? 'sol' : 'luna'];
+            if (c === 2) return ['Parcialmente nublado', esDia ? 'solnube' : 'nube'];
+            if (c === 3) return ['Nublado', 'nube'];
+            if (c === 45 || c === 48) return ['Niebla', 'niebla'];
+            if (c >= 51 && c <= 57) return ['Llovizna', 'lluvia'];
+            if (c >= 61 && c <= 67) return ['Lluvia', 'lluvia'];
+            if (c >= 71 && c <= 77) return ['Nieve', 'nieve'];
+            if (c >= 80 && c <= 82) return ['Chubascos', 'lluvia'];
+            if (c === 85 || c === 86) return ['Chubascos de nieve', 'nieve'];
+            if (c >= 95) return ['Tormenta', 'tormenta'];
+            return ['--', 'nube'];
+        }
+
+        function cargar() {
+            var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + cfg.latitud + '&longitude=' + cfg.longitud +
+                '&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day' +
+                '&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=4';
+            var x = new XMLHttpRequest();
+            x.open('GET', url, true);
+            x.onreadystatechange = function () {
+                if (x.readyState !== 4) return;
+                var d = null;
+                try { d = JSON.parse(x.responseText); } catch (e) { d = null; }
+                if (x.status === 200 && d && d.current) pintar(d);
+                else $('cl-desc').textContent = 'Sin datos del clima. Revisa internet.';
+            };
+            x.send(null);
+            setTimeout(cargar, CADA);
+        }
+
+        function pintar(d) {
+            var c = d.current, info = describir(c.weather_code, c.is_day === 1);
+            $('cl-icono').innerHTML = dibujo(info[1], 120);
+            $('cl-temp').textContent = Math.round(c.temperature_2m) + '°';
+            $('cl-desc').textContent = info[0];
+            $('cl-detalle').textContent = 'Sensación ' + Math.round(c.apparent_temperature) + '° · Humedad ' +
+                Math.round(c.relative_humidity_2m) + '% · Viento ' + Math.round(c.wind_speed_10m) + ' km/h';
+            var ahora = new Date();
+            $('cl-hora').textContent = 'Actualizado ' + pad(ahora.getHours()) + ':' + pad(ahora.getMinutes());
+
+            var html = '', dl = d.daily;
+            for (var i = 1; i <= 3 && i < dl.time.length; i++) {
+                var p = dl.time[i].split('-'); // "YYYY-MM-DD"
+                var f = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+                html += '<div class="cl-dia">' + dibujo(describir(dl.weather_code[i], true)[1], 44) +
+                        '<span class="nom">' + DIAS[f.getDay()] + '</span>' +
+                        '<span class="tmp">' + Math.round(dl.temperature_2m_max[i]) + '° / ' + Math.round(dl.temperature_2m_min[i]) + '°</span></div>';
+            }
+            $('cl-dias').innerHTML = html;
+        }
+
+        function ultimoCanal() {
+            var n = parseInt(leer('ultimo_canal') || '-1', 10);
+            return (n >= 0 && n < CONFIG.canales.length && CONFIG.canales[n].url) ? n : -1;
+        }
+
+        // Dibuja el botón según si hay un último canal visto
+        function actualizarBoton() {
+            var cont = $('sp-botones'), n = ultimoCanal();
+            var b = document.createElement('div');
+            b.className = 'boton';
+            b.setAttribute('data-accion', n >= 0 ? 'seguir' : 'tv');
+            b.innerHTML = '<div class="anillo"></div>' + (n >= 0 ? 'Seguir viendo: ' + CONFIG.canales[n].nombre : 'Abrir TV Abierta');
+            cont.innerHTML = '';
+            cont.appendChild(b);
+            focoSp = 0;
+            if (fila === 'sp') enfocarSp(0, false);
+        }
+
+        function accion(id) {
+            var n = ultimoCanal();
+            mostrarVista('tvabierta');
+            if (id === 'seguir' && n >= 0) {
+                enfocarCanal(n, false);
+                reproducir(n);
+            }
+        }
+
+        return {
+            iniciar: function () {
+                $('cl-ciudad').textContent = 'CLIMA · ' + (cfg.ciudad || '').toUpperCase();
+                actualizarBoton();
+                cargar();
+            },
+            accion: accion,
+            actualizarBoton: actualizarBoton
+        };
+    })();
+
+    /* ---------- Control remoto ---------- */
+    document.addEventListener('keydown', function (e) {
+        var code = e.keyCode || e.which;
+        iniciarAudio();
+
+        if (avisoAbierto) {
+            if (code === TECLA.OK || esAtras(code)) { e.preventDefault(); cerrarAviso(); }
+            return;
+        }
+
+        if (vista === 'diag') {
+            $('diag-tecla').textContent = 'Última tecla: keyCode ' + code + (e.key ? ' (' + e.key + ')' : '');
+            if (esAtras(code)) { e.preventDefault(); mostrarVista('inicio'); }
+            else if (code === TECLA.ABA) { e.preventDefault(); desplazarDiag(300); }
+            else if (code === TECLA.ARR) { e.preventDefault(); desplazarDiag(-300); }
+            return;
+        }
+
+        if (vista === 'inicio') {
+            if (esAtras(code)) { e.preventDefault(); return; }
+            var num = teclaNumero(code);
+            if (num !== null) {
+                secuencia = (secuencia + num).slice(-3);
+                clearTimeout(timerSecuencia);
+                timerSecuencia = setTimeout(function () { secuencia = ''; }, 2000);
+                if (secuencia === '999') { secuencia = ''; campana(); mostrarVista('diag'); }
+                return;
+            }
+            if (fila === 'riel') {
+                // ◀ cinco veces en la primera tarjeta abre el diagnóstico (el control no tiene números)
+                if (code === TECLA.IZQ && focoInicio === 0) {
+                    e.preventDefault();
+                    secuencia = (secuencia + 'L').slice(-5);
+                    clearTimeout(timerSecuencia);
+                    timerSecuencia = setTimeout(function () { secuencia = ''; }, 3000);
+                    if (secuencia === 'LLLLL') { secuencia = ''; campana(); mostrarVista('diag'); }
+                    return;
+                }
+                secuencia = '';
+                if (code === TECLA.DER) { e.preventDefault(); enfocarInicio(focoInicio + 1, true); }
+                else if (code === TECLA.IZQ) { e.preventDefault(); enfocarInicio(focoInicio - 1, true); }
+                else if (code === TECLA.ARR) { e.preventDefault(); irAFila('sp'); }
+                else if (code === TECLA.OK) { e.preventDefault(); abrirAcceso(CONFIG.accesos[focoInicio]); }
+            } else {
+                if (code === TECLA.DER) { e.preventDefault(); enfocarSp(focoSp + 1, true); }
+                else if (code === TECLA.IZQ) { e.preventDefault(); enfocarSp(focoSp - 1, true); }
+                else if (code === TECLA.ABA) { e.preventDefault(); irAFila('riel'); }
+                else if (code === TECLA.OK) {
+                    e.preventDefault();
+                    campana();
+                    panel.accion(botonesSp()[focoSp].getAttribute('data-accion'));
+                }
+            }
+            return;
+        }
+
+        if (vista === 'tvabierta') {
+            var completa = tieneClase($('tvabierta'), 'completa');
+            if (esAtras(code)) {
+                e.preventDefault();
+                if (completa) quitarClase($('tvabierta'), 'completa');
+                else mostrarVista('inicio');
+                return;
+            }
+            if (completa) {
+                if (code === TECLA.OK) { e.preventDefault(); quitarClase($('tvabierta'), 'completa'); }
+                else if (code === TECLA.ARR) { e.preventDefault(); cambiarVolTv(0.1); }
+                else if (code === TECLA.ABA) { e.preventDefault(); cambiarVolTv(-0.1); }
+                return;
+            }
+            if (code === TECLA.DER && (focoCanal % COLUMNAS_CANALES) < COLUMNAS_CANALES - 1) { e.preventDefault(); enfocarCanal(focoCanal + 1, true); }
+            else if (code === TECLA.IZQ && (focoCanal % COLUMNAS_CANALES) > 0) { e.preventDefault(); enfocarCanal(focoCanal - 1, true); }
+            else if (code === TECLA.ABA) { e.preventDefault(); enfocarCanal(focoCanal + COLUMNAS_CANALES, true); }
+            else if (code === TECLA.ARR) { e.preventDefault(); enfocarCanal(focoCanal - COLUMNAS_CANALES, true); }
+            else if (code === TECLA.OK) { e.preventDefault(); okCanal(); }
+        }
+    });
+
+    enfocarInicio(0, false);
+    panel.iniciar();
+    if (/[?&]diag=1/.test(location.search)) mostrarVista('diag');
+})();
+</script>
+</body>
+</html>
